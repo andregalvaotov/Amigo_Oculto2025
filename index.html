@@ -7,16 +7,18 @@
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 500px; margin: 20px auto; padding: 20px; background-color: #f0f2f5; text-align: center; }
         .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h1 { color: #d63384; }
+        h1 { color: #d63384; margin-bottom: 20px; }
         input { padding: 12px; width: 80%; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 10px; font-size: 16px; }
-        button { padding: 12px 20px; cursor: pointer; background: #28a745; color: white; border: none; border-radius: 8px; font-weight: bold; transition: 0.3s; width: 100%; margin-top: 10px; }
-        button:hover { background: #218838; }
+        button { padding: 12px 20px; cursor: pointer; background: #28a745; color: white; border: none; border-radius: 8px; font-weight: bold; width: 100%; margin-top: 10px; }
+        button:hover { opacity: 0.9; }
+        .btn-sortear { background: #007bff; }
+        .btn-whatsapp { background: #25d366; margin-top: 5px; font-size: 13px; }
+        .btn-copiar { background: #6c757d; font-size: 13px; }
         ul { list-style: none; padding: 0; text-align: left; }
-        li { background: #fff; margin: 10px 0; padding: 15px; border-radius: 8px; border: 1px solid #eee; display: flex; flex-direction: column; }
-        .link-url { font-size: 11px; color: #666; word-break: break-all; margin-top: 5px; background: #f8f9fa; padding: 5px; border-radius: 4px; }
+        li { background: #f8f9fa; margin: 15px 0; padding: 15px; border-radius: 8px; border: 1px solid #ddd; }
+        .link-url { font-size: 10px; color: #666; word-break: break-all; margin: 8px 0; padding: 5px; background: #eee; border-radius: 4px; }
         .hidden { display: none; }
-        .btn-revelar { background: #d63384; font-size: 18px; }
-        #nomeTirado { font-size: 28px; color: #d63384; font-weight: bold; margin-top: 20px; border: 2px dashed #d63384; padding: 10px; border-radius: 8px; }
+        #nomeTirado { font-size: 32px; color: #d63384; font-weight: bold; margin-top: 20px; border: 3px dashed #d63384; padding: 15px; border-radius: 10px; background: #fff5f8; }
     </style>
 </head>
 <body>
@@ -26,44 +28,61 @@
         <input type="text" id="nomeInput" placeholder="Nome do participante">
         <button onclick="adicionarNome()">Adicionar à Lista</button>
         <ul id="listaNomes"></ul>
-        <button id="btnSortear" onclick="realizarSorteio()" class="hidden" style="background: #007bff;">GERAR LINKS DO SORTEIO</button>
+        <button id="btnSortear" onclick="realizarSorteio()" class="hidden btn-sortear">GERAR LINKS DO SORTEIO</button>
     </div>
 
     <div id="resultado" class="card hidden">
-        <h2>Links Secretos</h2>
-        <p>Envie cada link para a pessoa correspondente:</p>
+        <h2>Links Gerados</h2>
+        <p>Envie os links abaixo:</p>
         <ul id="listaLinks"></ul>
-        <button onclick="location.href=window.location.pathname" style="background:#6c757d">Criar Novo Sorteio</button>
+        <button onclick="window.location.href=window.location.pathname" style="background:#444">Novo Sorteio</button>
     </div>
 
     <div id="revelacao" class="card hidden">
         <h2 id="olaPessoa">Olá!</h2>
         <p>Você foi convidado para o Amigo Oculto.</p>
-        <button class="btn-revelar" onclick="revelarAmigo()">REVELAR QUEM EU TIREI</button>
+        <button style="background: #d63384; font-size: 18px;" onclick="revelarAmigo()">REVELAR QUEM EU TIREI</button>
         <div id="nomeTirado" class="hidden"></div>
     </div>
 
     <script>
         let participantes = [];
 
-        // Lógica para carregar a revelação se houver dados na URL
+        // Função para codificar texto com acentos para Base64 com segurança
+        function b64EncodeUnicode(str) {
+            return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(match, p1) {
+                return String.fromCharCode('0x' + p1);
+            }));
+        }
+
+        // Função para decodificar Base64 com acentos
+        function b64DecodeUnicode(str) {
+            return decodeURIComponent(Array.prototype.map.call(atob(str), function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+        }
+
         window.onload = () => {
             const urlParams = new URLSearchParams(window.location.search);
-            const data = urlParams.get('n'); // 'n' contém o nome de quem tirou
-            const de = urlParams.get('de'); // 'de' contém o nome de quem está abrindo
+            const data = urlParams.get('n');
+            const de = urlParams.get('de');
             
             if (data && de) {
                 document.getElementById('setup').classList.add('hidden');
                 document.getElementById('revelacao').classList.remove('hidden');
-                document.getElementById('olaPessoa').innerText = `Olá, ${decodeURIComponent(atob(de))}!`;
-                window.amigoSecreto = decodeURIComponent(atob(data));
+                try {
+                    document.getElementById('olaPessoa').innerText = `Olá, ${b64DecodeUnicode(de)}!`;
+                    window.amigoSecreto = b64DecodeUnicode(data);
+                } catch(e) {
+                    alert("Erro ao ler o link. Verifique se ele foi copiado corretamente.");
+                }
             }
         };
 
         function adicionarNome() {
             const input = document.getElementById('nomeInput');
             const nome = input.value.trim();
-            if (nome) {
+            if (nome && !participantes.includes(nome)) {
                 participantes.push(nome);
                 input.value = '';
                 atualizarLista();
@@ -93,22 +112,22 @@
             document.getElementById('resultado').classList.remove('hidden');
 
             ulLinks.innerHTML = participantes.map((p, i) => {
-                // Codifica os nomes para Base64 para não ficarem visíveis logo de cara no link
-                const deCod = btoa(encodeURIComponent(p));
-                const paraCod = btoa(encodeURIComponent(embaralhado[i]));
+                const deCod = b64EncodeUnicode(p);
+                const paraCod = b64EncodeUnicode(embaralhado[i]);
                 const linkFinal = `${baseUrl}?de=${deCod}&n=${paraCod}`;
+                const msgWhatsapp = encodeURIComponent(`Olá ${p}! Aqui está seu link secreto para o Amigo Oculto: ${linkFinal}`);
                 
                 return `<li>
-                    <strong>Para: ${p}</strong>
+                    <strong>De: ${p}</strong>
                     <div class="link-url">${linkFinal}</div>
-                    <button onclick="copiar('${linkFinal}')" style="font-size:10px; padding:5px; width:auto;">Copiar Link</button>
+                    <button class="btn-copiar" onclick="copiar('${linkFinal}')">Copiar Link</button>
+                    <button class="btn-whatsapp" onclick="window.open('https://api.whatsapp.com/send?text=${msgWhatsapp}')">Enviar via WhatsApp</button>
                 </li>`;
             }).join('');
         }
 
         function copiar(texto) {
-            navigator.clipboard.writeText(texto);
-            alert("Link copiado!");
+            navigator.clipboard.writeText(texto).then(() => alert("Link copiado!"));
         }
 
         function revelarAmigo() {
