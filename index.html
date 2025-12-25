@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de Amigo Oculto</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; background-color: #f4f4f9; }
+        h1, h2 { color: #333; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        input { padding: 10px; width: 70%; border: 1px solid #ddd; border-radius: 4px; }
+        button { padding: 10px 15px; cursor: pointer; background: #28a745; color: white; border: none; border-radius: 4px; }
+        button.admin { background: #007bff; margin-top: 10px; }
+        ul { list-style: none; padding: 0; }
+        li { background: #eee; margin: 5px 0; padding: 10px; display: flex; justify-content: space-between; border-radius: 4px; }
+        .link-area { font-size: 0.8em; word-break: break-all; color: #555; background: #f9f9f9; padding: 5px; border: 1px dashed #ccc; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <h1>🎁 Amigo Oculto</h1>
+
+    <div id="setup" class="card">
+        <h2>1. Adicionar Participantes</h2>
+        <input type="text" id="nomeInput" placeholder="Digite o nome">
+        <button onclick="adicionarNome()">Adicionar</button>
+        <ul id="listaNomes"></ul>
+        <button onclick="realizarSorteio()" style="width: 100%; background: #dc3545; font-weight: bold;">SORTEAR AGORA!</button>
+    </div>
+
+    <div id="resultado" class="card hidden">
+        <h2>2. Links para Enviar</h2>
+        <p>Copie o link de cada pessoa e envie pelo WhatsApp/E-mail:</p>
+        <ul id="listaLinks"></ul>
+        <hr>
+        <button class="admin" onclick="toggleAdmin()">👁️ Ver/Ocultar Auditoria (Admin)</button>
+        <ul id="auditoria" class="hidden"></ul>
+        <br>
+        <button onclick="location.reload()">Criar Novo Sorteio</button>
+    </div>
+
+    <div id="revelacao" class="card hidden">
+        <h2 id="olaPessoa">Olá!</h2>
+        <p>Você clicou no seu link secreto. Clique abaixo para ver quem você tirou:</p>
+        <button onclick="revelarAmigo()">REVELAR AMIGO</button>
+        <h1 id="nomeTirado" class="hidden" style="color: #d63384;">---</h1>
+    </div>
+
+    <script>
+        let participantes = [];
+        let sorteioFinal = [];
+
+        // Verifica se há um ID na URL para o modo "Revelação"
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const amigoId = urlParams.get('id');
+            if (amigoId) {
+                document.getElementById('setup').classList.add('hidden');
+                document.getElementById('revelacao').classList.remove('hidden');
+                carregarRevelacao(amigoId);
+            }
+        };
+
+        function adicionarNome() {
+            const input = document.getElementById('nomeInput');
+            const nome = input.value.trim();
+            if (nome && !participantes.includes(nome)) {
+                participantes.push(nome);
+                atualizarLista();
+                input.value = '';
+            }
+        }
+
+        function atualizarLista() {
+            const ul = document.getElementById('listaNomes');
+            ul.innerHTML = participantes.map(n => `<li>${n}</li>`).join('');
+        }
+
+        function realizarSorteio() {
+            if (participantes.length < 3) {
+                alert("Adicione pelo menos 3 pessoas!");
+                return;
+            }
+
+            let embaralhado = [...participantes];
+            let valido = false;
+
+            while (!valido) {
+                // Algoritmo de Fisher-Yates
+                for (let i = embaralhado.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [embaralhado[i], embaralhado[j]] = [embaralhado[j], embaralhado[i]];
+                }
+                
+                // Validação: Ninguém pode tirar a si mesmo
+                valido = participantes.every((n, i) => n !== embaralhado[i]);
+            }
+
+            sorteioFinal = participantes.map((p, i) => ({
+                id: btoa(p + Math.random()).substring(0, 8), // Gera ID simples
+                de: p,
+                para: embaralhado[i]
+            }));
+
+            // Salva no localStorage para persistência do Admin
+            localStorage.setItem('ultimoSorteio', JSON.stringify(sorteioFinal));
+            exibirLinks();
+        }
+
+        function exibirLinks() {
+            document.getElementById('setup').classList.add('hidden');
+            document.getElementById('resultado').classList.remove('hidden');
+            
+            const baseUrl = window.location.href.split('?')[0];
+            const ulLinks = document.getElementById('listaLinks');
+            const ulAudit = document.getElementById('auditoria');
+
+            ulLinks.innerHTML = sorteioFinal.map(s => `
+                <li>
+                    <div><strong>${s.de}</strong></div>
+                    <div class="link-area">${baseUrl}?id=${s.id}</div>
+                </li>
+            `).join('');
+
+            ulAudit.innerHTML = sorteioFinal.map(s => `
+                <li>${s.de} ➡️ <strong>${s.para}</strong></li>
+            `).join('');
+        }
+
+        function toggleAdmin() {
+            document.getElementById('auditoria').classList.toggle('hidden');
+        }
+
+        function carregarRevelacao(id) {
+            const dados = JSON.parse(localStorage.getItem('ultimoSorteio'));
+            if (!dados) {
+                document.body.innerHTML = "<h1>Erro: Sorteio não encontrado.</h1>";
+                return;
+            }
+            const meuSorteio = dados.find(s => s.id === id);
+            if (meuSorteio) {
+                document.getElementById('olaPessoa').innerText = `Olá, ${meuSorteio.de}!`;
+                window.amigoSecreto = meuSorteio.para;
+            }
+        }
+
+        function revelarAmigo() {
+            const el = document.getElementById('nomeTirado');
+            el.innerText = window.amigoSecreto;
+            el.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
